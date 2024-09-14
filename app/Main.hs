@@ -25,7 +25,7 @@ main = do
   mgr <- newManager defaultManagerSettings
   bracket (forkIO $ runApp pool) killThread $ \_ -> do
     ms <- flip runClientM (mkClientEnv mgr (BaseUrl Http "localhost" 8080 "")) $ do
-      postMsg "hello"
-      postMsg "world"
-      getMsgs
+      postPhr "hello"
+      postPhr "world"
+      getPhrs
     print ms

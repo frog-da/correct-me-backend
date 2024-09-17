@@ -37,11 +37,13 @@ library
       aeson
     , base >=4.7 && <5
     , bytestring
+    , containers
     , http-client
     , postgresql-simple
     , resource-pool
     , servant-client
     , servant-server
+    , text
     , utf8-string
     , wai
     , warp
@@ -60,40 +62,14 @@ executable phrase-checker-backend-exe
       aeson
     , base
     , bytestring
+    , containers
     , http-client
     , phrase-checker-backend
     , postgresql-simple
     , resource-pool
     , servant-client
     , servant-server
-    , utf8-string
-    , wai
-    , warp
-  default-language: Haskell2010
-
-test-suite phrase-checker-backend-test
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Paths_phrase_checker_backend
-  autogen-modules:
-      Paths_phrase_checker_backend
-  hs-source-dirs:
-      test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      aeson
-    , base
-    , bytestring
-    , hspec
-    , hspec-wai
-    , hspec-wai-json
-    , http-client
-    , phrase-checker-backend
-    , postgresql-simple
-    , resource-pool
-    , servant-client
-    , servant-server
+    , text
     , utf8-string
     , wai
     , warp

@@ -22,10 +22,12 @@ main = do
   pool <- initConnectionPool connStr
   initDB connStr
 
-  mgr <- newManager defaultManagerSettings
-  bracket (forkIO $ runApp pool) killThread $ \_ -> do
-    ms <- flip runClientM (mkClientEnv mgr (BaseUrl Http "localhost" 8080 "")) $ do
-      postPhr "hello"
-      postPhr "world"
-      getPhrs
-    print ms
+  runApp pool
+
+  -- mgr <- newManager defaultManagerSettings
+  -- bracket (forkIO $ runApp pool) killThread $ \_ -> do
+  --   ms <- flip runClientM (mkClientEnv mgr (BaseUrl Http "localhost" 8080 "")) $ do
+  --     postPhr "hello"
+  --     postPhr "world"
+  --     getPhrs
+  --   print ms

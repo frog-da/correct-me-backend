@@ -14,7 +14,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as BS
 import Database.PostgreSQL.Simple hiding ((:.))
 import Network.Wai.Handler.Warp ( run )
-import Servant 
+import Servant
 import Servant.Client
 import Data.Pool
 import Data.ByteString (ByteString)
@@ -23,7 +23,7 @@ import qualified Data.Text.Encoding as E
 
 
 type DBConnectionString = BS.ByteString
-type Phrase = String
+type Phrase = T.Text
 type Username = T.Text
 type Password = T.Text
 data User = User
@@ -31,10 +31,13 @@ data User = User
   , pass :: Password
   } deriving (Eq, Show)
 
-type API = 
+type API =
       BasicAuth "People's Phrases" User :>
-    ( ReqBody '[PlainText] Phrase :> Post '[JSON] NoContent
-      :<|> Get '[JSON] [Phrase]
+    ( ReqBody '[JSON] Phrase :> Post '[JSON] Bool
+      :<|> "phrases" :> Get '[JSON]  [(Username, Phrase)]
+      :<|> "phrases" :> "my" :> Get '[JSON]  [(Username, Phrase)]
+      :<|> "phrases" :> "unapproved" :> Get '[JSON]  [(Username, Phrase)]
+      -- :<|> "phrases" :> "my" :> QueryParam "approved" Bool :> Put '[JSON] Bool
     )
 
 api :: Proxy API
@@ -42,24 +45,50 @@ api = Proxy
 
 initDB :: DBConnectionString -> IO ()
 initDB connstr = bracket (connectPostgreSQL connstr) close $ \conn -> do
-  execute_ conn "create table if not exists phrases (phrase text not null)"
-  execute_ conn "create table if not exists users (username text not null, password text not null)"
+  execute_ conn "CREATE TABLE if not exists users (username TEXT PRIMARY KEY, password TEXT NOT NULL)"
+  execute_ conn "CREATE TABLE if not exists phrases (phrase TEXT NOT NULL, username TEXT NOT NULL, approved BOOLEAN DEFAULT FALSE, FOREIGN KEY (username) REFERENCES users (username))"
   return ()
 
 server :: Pool Connection -> Server API
-server conns user = postPhrase :<|> getPhrase 
-  where postPhrase :: Phrase -> Handler NoContent
+server conns (User username _) = postPhrase :<|> getPhrases :<|> getMyPhrases :<|> getUnapprovedPhrases 
+-- :<|> approvePhrase
+  where postPhrase :: Phrase -> Handler Bool
         postPhrase phr = do
           liftIO . withResource conns $ \conn ->
             execute conn
-                    "INSERT INTO phrases VALUES (?)"
-                    (Only phr)
-          return NoContent
+                    "INSERT INTO phrases VALUES (?, ?)"
+                    (phr, username)
+          pure True
 
-        getPhrase :: Handler [Phrase]
-        getPhrase = fmap (map fromOnly) . liftIO $
+        getPhrases :: Handler [(Username, Phrase)]
+        getPhrases = liftIO $
          withResource conns $ \conn ->
-            query_ conn "SELECT phrase FROM phrases"
+            query_ conn "SELECT username, phrase FROM phrases"
+
+        getMyPhrases :: Handler  [(Username, Phrase)]
+        getMyPhrases = liftIO $ withResource conns $ \conn ->
+          (query conn
+                "SELECT username, phrase FROM phrases WHERE username = ?"
+                (Only username) :: IO [(Username, Phrase)])  >>= \case
+                  phrs -> pure phrs
+
+        getUnapprovedPhrases :: Handler  [(Username, Phrase)]
+        getUnapprovedPhrases = liftIO $ withResource conns $ \conn ->
+          (query conn
+                "SELECT username, phrase FROM phrases WHERE approved = FALSE"
+                () :: IO [(Username, Phrase)])  >>= \case
+                  phrs -> pure phrs
+
+        -- approvePhrase :: Maybe Bool -> Handler Bool
+        -- approvePhrase status = do
+        --   case status of
+        --     Just status' -> (do
+        --       liftIO . withResource conns $ \conn ->
+        --         execute conn
+        --                 "UPDATE phrases SET approved = ? WHERE username = ?"
+        --                 (status', username)
+        --       pure True)
+        --     _ -> pure False
 
 checkBasicAuth :: Pool Connection -> BasicAuthCheck User
 checkBasicAuth conns = BasicAuthCheck $ \basicAuthData ->
@@ -69,7 +98,7 @@ checkBasicAuth conns = BasicAuthCheck $ \basicAuthData ->
     liftIO $ withResource conns $ \conn ->
     query conn
       "SELECT * FROM users WHERE username = ?"
-      (username, password) >>= \case
+      (Only username) >>= \case
         [] -> return NoSuchUser
         [(username, pass)] -> if pass == password then return (Authorized (User username password)) else return BadPassword
 

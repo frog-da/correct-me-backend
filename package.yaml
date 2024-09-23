@@ -33,6 +33,7 @@ dependencies:
 - utf8-string
 - text
 - containers
+- aeson
 
 ghc-options:
 - -Wall
